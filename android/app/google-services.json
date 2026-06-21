@@ -14,6 +14,14 @@
       },
       "oauth_client": [
         {
+          "client_id": "19970207099-jbppg2etafqj98rdnuhj8cl9oloed6lg.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.trustshield.ai",
+            "certificate_hash": "1876eef09800c6fa746462d90abaa691ba94314c"
+          }
+        },
+        {
           "client_id": "19970207099-fh565ep4r7husr76hm1rt9lf5r2q5rcj.apps.googleusercontent.com",
           "client_type": 3
         }
