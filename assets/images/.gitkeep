@@ -1,0 +1,12 @@
+# TrustShield AI Assets
+
+Place your app assets here:
+
+- `images/` — PNG/JPG images
+- `icons/`  — SVG and PNG icons  
+- `animations/` — Lottie JSON animation files
+
+## Required Files
+- `images/logo.png` — App logo (optional, app uses Icon widget)
+- `animations/shield_scan.json` — Lottie animation for scanning (optional)
+- `icons/app_icon.svg` — App icon SVG (optional)

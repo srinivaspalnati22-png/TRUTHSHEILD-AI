@@ -1,0 +1,146 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ============================================
+    // HELPER FUNCTIONS
+    // ============================================
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isOwner(uid) {
+      return isAuthenticated() && request.auth.uid == uid;
+    }
+    
+    function getUserRole() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+    }
+    
+    function isAdmin() {
+      return isAuthenticated() && getUserRole() == 'admin';
+    }
+    
+    function isModerator() {
+      return isAuthenticated() && (getUserRole() == 'admin' || getUserRole() == 'moderator');
+    }
+    
+    function isValidScanType() {
+      return request.resource.data.scanType in ['message', 'url', 'document', 'notification', 'factCheck'];
+    }
+    
+    function isValidThreatLevel() {
+      return request.resource.data.threatLevel in ['safe', 'low', 'medium', 'high', 'critical'];
+    }
+    
+    function hasNoMaliciousContent() {
+      return request.resource.data.content.size() <= 2000;
+    }
+
+    // ============================================
+    // USERS COLLECTION
+    // ============================================
+    
+    match /users/{userId} {
+      // Users can read/update their own document
+      allow read: if isOwner(userId) || isModerator();
+      allow create: if isOwner(userId);
+      allow update: if isOwner(userId) || isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // ============================================
+    // SCAN HISTORY
+    // ============================================
+    
+    match /scan_history/{userId}/scans/{scanId} {
+      // Users can only access their own scans
+      allow read: if isOwner(userId) || isAdmin();
+      allow create: if isOwner(userId) 
+        && isValidScanType()
+        && isValidThreatLevel();
+      allow update: if isOwner(userId);
+      allow delete: if isOwner(userId) || isAdmin();
+    }
+
+    // ============================================
+    // URL SCANS
+    // ============================================
+    
+    match /url_scans/{scanId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // ============================================
+    // DOCUMENT SCANS
+    // ============================================
+    
+    match /document_scans/{scanId} {
+      allow read: if isAuthenticated() && 
+        request.auth.uid == resource.data.userId;
+      allow create: if isAuthenticated();
+      allow delete: if isAuthenticated() && 
+        request.auth.uid == resource.data.userId;
+    }
+
+    // ============================================
+    // COMMUNITY REPORTS
+    // ============================================
+    
+    match /community_threats/{reportId} {
+      // Anyone authenticated can read community threats
+      allow read: if isAuthenticated();
+      
+      // Any authenticated user can create a report
+      allow create: if isAuthenticated()
+        && request.resource.data.reporterId == request.auth.uid
+        && request.resource.data.description.size() >= 20
+        && request.resource.data.description.size() <= 1000;
+      
+      // Only moderators/admins can update (approve/reject)
+      allow update: if isModerator();
+      allow delete: if isAdmin();
+    }
+
+    // ============================================
+    // ANALYTICS
+    // ============================================
+    
+    match /analytics/{docId} {
+      allow read: if isModerator();
+      allow write: if isAdmin();
+    }
+
+    // ============================================
+    // SETTINGS
+    // ============================================
+    
+    match /settings/{userId} {
+      allow read, write: if isOwner(userId);
+    }
+
+    // ============================================
+    // NOTIFICATION SCANS
+    // ============================================
+    
+    match /notification_scans/{userId}/scans/{scanId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow create: if isOwner(userId);
+      // Content is never permanently stored
+      allow delete: if isOwner(userId) || isAdmin();
+    }
+
+    // ============================================
+    // ADMIN ONLY
+    // ============================================
+    
+    match /admin/{document=**} {
+      allow read, write: if isAdmin();
+    }
+  }
+}
