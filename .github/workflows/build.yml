@@ -27,7 +27,14 @@ jobs:
           cache: true
 
       - name: 📦 Install dependencies
-        run: flutter pub get
+        run: flutter pub get > pub_get.log 2>&1 || true
+
+      - name: 📤 Upload Error Log (if failed)
+        uses: actions/upload-artifact@v4
+        with:
+          name: pub-get-log
+          path: pub_get.log
+          retention-days: 1
 
       - name: 🔨 Build APK
         run: flutter build apk --release
