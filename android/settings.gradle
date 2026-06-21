@@ -7,7 +7,7 @@ pluginManagement {
         }
         def sdkPath = properties["flutter.sdk"] ?: System.env.FLUTTER_ROOT
         if (sdkPath == null) {
-            throw new GradleException("Flutter SDK not found. Define flutter.sdk in local.properties or set FLUTTER_ROOT env variable.")
+            throw new Exception("Flutter SDK not found. Define flutter.sdk in local.properties or set FLUTTER_ROOT env variable.")
         }
         sdkPath
     }()
