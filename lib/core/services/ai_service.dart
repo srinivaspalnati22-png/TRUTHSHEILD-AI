@@ -101,15 +101,19 @@ class AIService {
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        final text =
+        String text =
             data['candidates']?[0]?['content']?['parts']?[0]?['text'] ?? '{}';
+        
+        // Remove markdown formatting if Gemini returns it
+        text = text.replaceAll('```json', '').replaceAll('```', '').trim();
+        
         return {'text': text, 'raw': jsonDecode(text)};
       } else {
-        throw Exception('AI API error: ${response.statusCode}');
+        throw Exception('AI API error: ${response.statusCode} - ${response.body}');
       }
     } catch (e) {
-      // Return mock response for development
-      return _getMockResponse(prompt);
+      print('Gemini API Error: \$e');
+      throw Exception('Failed to analyze: \$e');
     }
   }
 

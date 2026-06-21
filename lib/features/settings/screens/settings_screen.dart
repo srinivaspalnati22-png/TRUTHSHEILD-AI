@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_theme.dart';
@@ -13,12 +14,50 @@ class SettingsScreen extends ConsumerStatefulWidget {
 }
 
 class _SettingsScreenState extends ConsumerState<SettingsScreen> {
-  bool _notifListener = true;
+  static const platform = MethodChannel('com.trustshield.ai/permissions');
+  
+  bool _notifListener = false;
   bool _autoScan = true;
   bool _biometricAuth = false;
   bool _deleteAfterScan = true;
   bool _communityReports = true;
   bool _emailAlerts = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkPermissionStatus();
+  }
+
+  Future<void> _checkPermissionStatus() async {
+    try {
+      final bool isGranted = await platform.invokeMethod('isNotificationListenerGranted');
+      setState(() {
+        _notifListener = isGranted;
+      });
+    } catch (e) {
+      print('Error checking permission: \$e');
+    }
+  }
+
+  Future<void> _toggleNotificationListener(bool value) async {
+    if (value) {
+      try {
+        await platform.invokeMethod('requestNotificationListenerPermission');
+        await platform.invokeMethod('requestOverlayPermission');
+        // Check again after a delay since the user returns from settings
+        Future.delayed(const Duration(seconds: 2), _checkPermissionStatus);
+      } catch (e) {
+        print('Error requesting permission: \$e');
+      }
+    } else {
+      // Directing user to turn it off manually
+      try {
+        await platform.invokeMethod('requestNotificationListenerPermission');
+      } catch (e) {}
+    }
+    setState(() => _notifListener = value);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -53,7 +92,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               label: 'Notification Listener',
               subtitle: 'Monitor WhatsApp, SMS, Gmail in real-time',
               value: _notifListener,
-              onChanged: (v) => setState(() => _notifListener = v),
+              onChanged: _toggleNotificationListener,
             ),
             _SwitchTile(
               icon: Icons.auto_mode,
