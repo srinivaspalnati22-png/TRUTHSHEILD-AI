@@ -1,25 +1,14 @@
-def localProperties = new Properties()
-def localPropertiesFile = rootProject.file('local.properties')
-if (localPropertiesFile.exists()) {
-    localPropertiesFile.withReader('UTF-8') { reader ->
-        localProperties.load(reader)
-    }
+plugins {
+    id "com.android.application"
+    id "org.jetbrains.kotlin.android"
+    id "dev.flutter.flutter-gradle-plugin"
+    id "com.google.gms.google-services"
 }
-
-def flutterRoot = localProperties.getProperty('flutter.sdk')
-if (flutterRoot == null) {
-    throw new GradleException("Flutter SDK not found. Define location with flutter.sdk in the local.properties file.")
-}
-
-apply plugin: 'com.android.application'
-apply plugin: 'kotlin-android'
-apply plugin: 'com.google.gms.google-services'
-apply from: "$flutterRoot/packages/flutter_tools/gradle/flutter.gradle"
 
 android {
     namespace "com.trustshield.ai"
-    compileSdkVersion 34
-    ndkVersion flutter.ndkVersion
+    compileSdk 34
+    ndkVersion "27.0.12077973"
 
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_1_8
@@ -27,52 +16,42 @@ android {
     }
 
     kotlinOptions {
-        jvmTarget = '1.8'
+        jvmTarget = "1.8"
     }
 
     sourceSets {
-        main.java.srcDirs += 'src/main/kotlin'
+        main.java.srcDirs += "src/main/kotlin"
     }
 
     defaultConfig {
         applicationId "com.trustshield.ai"
-        minSdkVersion 23
-        targetSdkVersion 34
+        minSdk 23
+        targetSdk 34
         versionCode 1
         versionName "1.0.0"
         multiDexEnabled true
-    }
-
-    signingConfigs {
-        release {
-            keyAlias 'trustshield'
-            keyPassword 'trustshield2024'
-            storeFile file('trustshield-keystore.jks')
-            storePassword 'trustshield2024'
-        }
     }
 
     buildTypes {
         release {
             signingConfig signingConfigs.debug
             minifyEnabled true
-            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            proguardFiles getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro"
         }
         debug {
             signingConfig signingConfigs.debug
-            applicationIdSuffix ".debug"
             debuggable true
         }
     }
 }
 
 flutter {
-    source '../..'
+    source "../.."
 }
 
 dependencies {
-    implementation 'androidx.multidex:multidex:2.0.1'
-    implementation platform('com.google.firebase:firebase-bom:33.0.0')
-    implementation 'com.google.firebase:firebase-analytics'
-    implementation 'com.google.android.gms:play-services-auth:21.0.0'
+    implementation "androidx.multidex:multidex:2.0.1"
+    implementation platform("com.google.firebase:firebase-bom:33.0.0")
+    implementation "com.google.firebase:firebase-analytics"
+    implementation "com.google.android.gms:play-services-auth:21.0.0"
 }
