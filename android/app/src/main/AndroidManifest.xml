@@ -22,7 +22,7 @@
     <application
         android:label="TrustShield AI"
         android:name="${applicationName}"
-        android:icon="@drawable/ic_launcher"
+        android:icon="@mipmap/ic_launcher"
         android:allowBackup="false"
         android:theme="@style/LaunchTheme"
         android:usesCleartextTraffic="false"
