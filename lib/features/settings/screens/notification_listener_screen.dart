@@ -152,9 +152,10 @@ class _AlertCard extends StatelessWidget {
     final trustScore = alert['trustScore'] as int? ?? 50;
     final color = AppColors.trustScoreColor(trustScore);
 
-    return GlassCard(
-      margin: const EdgeInsets.only(bottom: 12),
-      child: Column(
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: GlassCard(
+        child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
