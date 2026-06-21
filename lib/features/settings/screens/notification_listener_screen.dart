@@ -237,7 +237,7 @@ class _AlertCard extends StatelessWidget {
           ),
         ],
       ),
-    );
+    ));
   }
 
   String _formatTime(int? ms) {
