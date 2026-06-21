@@ -8,6 +8,7 @@ import '../../../core/widgets/trust_score_gauge.dart';
 import '../../../core/services/ai_service.dart';
 import '../../../core/providers/auth_provider.dart';
 import '../models/scan_result.dart';
+import '../../../core/widgets/scanning_animation.dart';
 import '../../../core/services/scan_history_service.dart';
 
 class UrlScannerScreen extends ConsumerStatefulWidget {

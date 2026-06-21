@@ -8,6 +8,7 @@ import '../../../core/widgets/trust_score_gauge.dart';
 import '../../../core/services/ai_service.dart';
 import '../../../core/providers/auth_provider.dart';
 import '../models/scan_result.dart';
+import '../../../core/widgets/scanning_animation.dart';
 import '../../../core/services/scan_history_service.dart';
 
 class MessageScannerScreen extends ConsumerStatefulWidget {
@@ -183,18 +184,21 @@ class _MessageScannerScreenState extends ConsumerState<MessageScannerScreen> {
 
             const SizedBox(height: 16),
 
-            // Analyze button
-            PrimaryButton(
-              label: _isAnalyzing ? 'Analyzing...' : 'Analyze with AI',
-              icon: _isAnalyzing ? null : Icons.security,
-              isLoading: _isAnalyzing,
-              onPressed: _analyze,
-            ).animate(delay: 200.ms).fadeIn(duration: 300.ms),
+            // Analyze button or Animation
+            if (_isAnalyzing)
+              const ScanningAnimation()
+            else ...[
+              PrimaryButton(
+                label: 'Analyze with AI',
+                icon: Icons.security,
+                onPressed: _analyze,
+              ).animate(delay: 200.ms).fadeIn(duration: 300.ms),
 
-            const SizedBox(height: 24),
+              const SizedBox(height: 24),
 
-            // Results
-            if (_result != null) _buildResults(_result!),
+              // Results
+              if (_result != null) _buildResults(_result!),
+            ],
           ],
         ),
       ),
