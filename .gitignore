@@ -12,7 +12,6 @@ build/
 # Android
 android/.gradle
 android/local.properties
-android/app/google-services.json
 **/android/gradlew
 **/android/gradlew.bat
 **/android/gradle/wrapper/gradle-wrapper.jar
