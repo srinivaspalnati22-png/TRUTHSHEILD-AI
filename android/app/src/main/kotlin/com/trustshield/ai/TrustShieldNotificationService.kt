@@ -33,7 +33,7 @@ class TrustShieldNotificationService : NotificationListenerService() {
         // Gemini API Key - same as Flutter side
         private const val API_KEY = "AIzaSyDprILzSUz3ZqcA8SRrE5iD6tk2OCzFwM0"
         private const val GEMINI_URL =
-            "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=$API_KEY"
+            "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=$API_KEY"
 
         // Apps to monitor (package names)
         private val MONITORED_APPS = setOf(

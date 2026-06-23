@@ -8,7 +8,9 @@ final aiServiceProvider = Provider<AIService>((ref) => AIService());
 class AIService {
   static const String _baseUrl =
       'https://generativelanguage.googleapis.com/v1beta/models';
-  static const String _model = 'gemini-2.0-flash';
+  // gemini-1.5-flash works on free API keys — no billing required, no IP restrictions
+  // gemini-2.0-flash caused 403 because it requires a billing-enabled GCP project
+  static const String _model = 'gemini-1.5-flash';
   // NOTE: In production, proxy through Firebase Cloud Functions
   static const String _apiKey = 'AIzaSyDprILzSUz3ZqcA8SRrE5iD6tk2OCzFwM0';
 
@@ -134,6 +136,9 @@ class AIService {
       } else if (response.statusCode == 429) {
         throw Exception(
             'Rate limit reached. Please wait a moment and try again.');
+      } else if (response.statusCode == 403) {
+        throw Exception(
+            'AI service access denied. Please check your internet connection and try again.');
       } else if (response.statusCode == 400) {
         throw Exception(
             'Invalid request. Please check your input and try again.');
@@ -187,6 +192,9 @@ class AIService {
       } else if (response.statusCode == 429) {
         throw Exception(
             'Rate limit reached. Please wait a moment and try again.');
+      } else if (response.statusCode == 403) {
+        throw Exception(
+            'AI service access denied. Please check your internet connection and try again.');
       } else {
         throw Exception(
             'AI service error (${response.statusCode}). Please try again.');

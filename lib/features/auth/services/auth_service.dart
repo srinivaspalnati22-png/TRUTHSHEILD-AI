@@ -9,7 +9,10 @@ final authServiceProvider = Provider<AuthService>((ref) => AuthService());
 class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  final GoogleSignIn _googleSignIn = GoogleSignIn();
+  // Web client ID (type 3) from google-services.json — required for Firebase Google Sign-In
+  final GoogleSignIn _googleSignIn = GoogleSignIn(
+    serverClientId: '19970207099-fh565ep4r7husr76hm1rt9lf5r2q5rcj.apps.googleusercontent.com',
+  );
 
   Future<UserCredential> signInWithEmail({
     required String email,
