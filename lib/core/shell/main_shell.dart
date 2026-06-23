@@ -2,6 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../theme/app_theme.dart';
+import '../services/background_service.dart';
+
+// Provider to track live threat count for badge
+final threatCountProvider = StateProvider<int>((ref) => 0);
 
 class MainShell extends ConsumerStatefulWidget {
   final Widget child;
@@ -23,22 +27,40 @@ class _MainShellState extends ConsumerState<MainShell> {
   ];
 
   @override
+  void initState() {
+    super.initState();
+    _startBackgroundListening();
+  }
+
+  void _startBackgroundListening() {
+    final bgService = ref.read(backgroundServiceProvider);
+    bgService.onThreatDetected = (data) {
+      ref.read(threatCountProvider.notifier).state++;
+    };
+    bgService.startListening();
+  }
+
+  @override
+  void dispose() {
+    ref.read(backgroundServiceProvider).stopListening();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final threatCount = ref.watch(threatCountProvider);
 
     return Scaffold(
       body: widget.child,
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
-          color: isDark ? AppColors.darkCard : AppColors.lightCard,
-          border: Border(
-            top: BorderSide(
-              color: isDark ? AppColors.darkBorder : AppColors.lightBorder,
-            ),
+          color: AppColors.darkCard,
+          border: const Border(
+            top: BorderSide(color: AppColors.darkBorder),
           ),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.2),
+              color: Colors.black.withOpacity(0.3),
               blurRadius: 20,
               offset: const Offset(0, -5),
             ),
@@ -54,11 +76,19 @@ class _MainShellState extends ConsumerState<MainShell> {
                 final item = entry.value;
                 final isActive = _currentIndex == index;
 
+                // Show threat badge on Home tab
+                final showBadge = index == 0 && threatCount > 0;
+
                 return _NavBarItem(
                   item: item,
                   isActive: isActive,
+                  badgeCount: showBadge ? threatCount : 0,
                   onTap: () {
                     setState(() => _currentIndex = index);
+                    if (index == 0) {
+                      // Clear badge when navigating home
+                      ref.read(threatCountProvider.notifier).state = 0;
+                    }
                     context.go(item.path);
                   },
                 );
@@ -74,11 +104,13 @@ class _MainShellState extends ConsumerState<MainShell> {
 class _NavBarItem extends StatefulWidget {
   final _NavItem item;
   final bool isActive;
+  final int badgeCount;
   final VoidCallback onTap;
 
   const _NavBarItem({
     required this.item,
     required this.isActive,
+    required this.badgeCount,
     required this.onTap,
   });
 
@@ -88,43 +120,43 @@ class _NavBarItem extends StatefulWidget {
 
 class _NavBarItemState extends State<_NavBarItem>
     with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
-  late Animation<double> _scaleAnimation;
+  late AnimationController _ctrl;
+  late Animation<double> _scaleAnim;
 
   @override
   void initState() {
     super.initState();
-    _controller = AnimationController(
-      duration: const Duration(milliseconds: 200),
+    _ctrl = AnimationController(
+      duration: const Duration(milliseconds: 150),
       vsync: this,
     );
-    _scaleAnimation = Tween<double>(begin: 1.0, end: 0.85).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
+    _scaleAnim = Tween<double>(begin: 1.0, end: 0.87).animate(
+      CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut),
     );
   }
 
   @override
   void dispose() {
-    _controller.dispose();
+    _ctrl.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTapDown: (_) => _controller.forward(),
+      onTapDown: (_) => _ctrl.forward(),
       onTapUp: (_) {
-        _controller.reverse();
+        _ctrl.reverse();
         widget.onTap();
       },
-      onTapCancel: () => _controller.reverse(),
+      onTapCancel: () => _ctrl.reverse(),
       child: ScaleTransition(
-        scale: _scaleAnimation,
+        scale: _scaleAnim,
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 200),
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(14),
             color: widget.isActive
                 ? AppColors.primary.withOpacity(0.15)
                 : Colors.transparent,
@@ -132,22 +164,56 @@ class _NavBarItemState extends State<_NavBarItem>
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              AnimatedSwitcher(
-                duration: const Duration(milliseconds: 200),
-                child: Icon(
-                  widget.isActive ? widget.item.activeIcon : widget.item.icon,
-                  key: ValueKey(widget.isActive),
-                  color: widget.isActive ? AppColors.primary : AppColors.darkSubtext,
-                  size: 24,
-                ),
+              Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 200),
+                    child: Icon(
+                      widget.isActive ? widget.item.activeIcon : widget.item.icon,
+                      key: ValueKey(widget.isActive),
+                      color: widget.isActive
+                          ? AppColors.primary
+                          : AppColors.darkSubtext,
+                      size: 24,
+                    ),
+                  ),
+                  if (widget.badgeCount > 0)
+                    Positioned(
+                      top: -4,
+                      right: -8,
+                      child: Container(
+                        padding: const EdgeInsets.all(3),
+                        constraints: const BoxConstraints(
+                            minWidth: 16, minHeight: 16),
+                        decoration: const BoxDecoration(
+                          color: AppColors.danger,
+                          shape: BoxShape.circle,
+                        ),
+                        child: Text(
+                          '${widget.badgeCount > 9 ? '9+' : widget.badgeCount}',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 9,
+                            fontWeight: FontWeight.w800,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    ),
+                ],
               ),
               const SizedBox(height: 4),
               AnimatedDefaultTextStyle(
                 duration: const Duration(milliseconds: 200),
                 style: TextStyle(
                   fontSize: 10,
-                  fontWeight: widget.isActive ? FontWeight.w600 : FontWeight.w400,
-                  color: widget.isActive ? AppColors.primary : AppColors.darkSubtext,
+                  fontWeight: widget.isActive
+                      ? FontWeight.w700
+                      : FontWeight.w400,
+                  color: widget.isActive
+                      ? AppColors.primary
+                      : AppColors.darkSubtext,
                 ),
                 child: Text(widget.item.label),
               ),

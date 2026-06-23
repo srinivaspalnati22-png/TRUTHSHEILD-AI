@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_theme.dart';
-import '../../../core/widgets/glass_card.dart';
 import '../../../core/services/ai_service.dart';
 
 class AiAssistantScreen extends ConsumerStatefulWidget {
@@ -36,13 +35,20 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
   ];
 
   Future<void> _sendMessage(String text) async {
-    if (text.trim().isEmpty) return;
+    final trimmed = text.trim();
+    if (trimmed.isEmpty || _isLoading) return;
     _messageController.clear();
+
+    // Build history BEFORE adding new message (to avoid sending it twice)
+    final history = _messages
+        .where((m) => m.role != 'typing')
+        .map((m) => {'role': m.role, 'content': m.content})
+        .toList();
 
     setState(() {
       _messages.add(_ChatMessage(
         role: 'user',
-        content: text,
+        content: trimmed,
         timestamp: DateTime.now(),
       ));
       _isLoading = true;
@@ -52,18 +58,15 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
 
     try {
       final aiService = ref.read(aiServiceProvider);
-      final history = _messages
-          .where((m) => m.role != 'typing')
-          .map((m) => {'role': m.role, 'content': m.content})
-          .toList();
-
-      final response = await aiService.chat(text, history);
+      final response = await aiService.chat(trimmed, history);
 
       if (mounted) {
         setState(() {
           _messages.add(_ChatMessage(
             role: 'assistant',
-            content: response,
+            content: response.isNotEmpty
+                ? response
+                : 'I apologize, I could not process that. Please try again.',
             timestamp: DateTime.now(),
           ));
           _isLoading = false;
@@ -75,8 +78,7 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
         setState(() {
           _messages.add(_ChatMessage(
             role: 'assistant',
-            content:
-                'I\'m sorry, I encountered an error. Please try again.',
+            content: 'Sorry, I encountered an error: ${e.toString().replaceAll('Exception: ', '')}',
             timestamp: DateTime.now(),
           ));
           _isLoading = false;
@@ -86,15 +88,33 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
   }
 
   void _scrollToBottom() {
-    Future.delayed(const Duration(milliseconds: 100), () {
+    Future.delayed(const Duration(milliseconds: 150), () {
       if (_scrollController.hasClients) {
         _scrollController.animateTo(
           _scrollController.position.maxScrollExtent,
-          duration: const Duration(milliseconds: 300),
+          duration: const Duration(milliseconds: 350),
           curve: Curves.easeOut,
         );
       }
     });
+  }
+
+  void _clearChat() {
+    setState(() {
+      _messages.clear();
+      _messages.add(_ChatMessage(
+        role: 'assistant',
+        content: 'Chat cleared. 🛡️ How can I help you stay safe today?',
+        timestamp: DateTime.now(),
+      ));
+    });
+  }
+
+  @override
+  void dispose() {
+    _messageController.dispose();
+    _scrollController.dispose();
+    super.dispose();
   }
 
   @override
@@ -118,11 +138,12 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text('TrustShield AI',
-                    style:
-                        TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                    style: TextStyle(
+                        fontSize: 16, fontWeight: FontWeight.w700,
+                        color: AppColors.darkText)),
                 Text('Powered by Gemini',
-                    style:
-                        TextStyle(fontSize: 11, color: AppColors.darkSubtext)),
+                    style: TextStyle(
+                        fontSize: 10, color: AppColors.darkSubtext)),
               ],
             ),
           ],
@@ -131,14 +152,9 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
         leading: const BackButton(),
         actions: [
           IconButton(
-            icon: const Icon(Icons.refresh_outlined),
-            onPressed: () => setState(() => _messages
-              ..clear()
-              ..add(_ChatMessage(
-                role: 'assistant',
-                content: 'Chat cleared. How can I help you stay safe today?',
-                timestamp: DateTime.now(),
-              ))),
+            icon: const Icon(Icons.refresh_outlined, color: AppColors.darkSubtext),
+            tooltip: 'Clear chat',
+            onPressed: _clearChat,
           ),
         ],
       ),
@@ -158,7 +174,7 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
                 return _ChatBubble(message: msg)
                     .animate()
                     .fadeIn(duration: 300.ms)
-                    .slideY(begin: 0.2, duration: 300.ms, curve: Curves.easeOut);
+                    .slideY(begin: 0.15, duration: 300.ms, curve: Curves.easeOut);
               },
             ),
           ),
@@ -166,47 +182,51 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
           // Quick actions (show only if few messages)
           if (_messages.length <= 2)
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Quick Actions',
+                  const Text('Quick Actions',
                       style: TextStyle(
-                          fontSize: 12,
+                          fontSize: 11,
                           color: AppColors.darkSubtext,
-                          fontWeight: FontWeight.w500)),
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: 0.5)),
                   const SizedBox(height: 8),
                   Wrap(
                     spacing: 8,
                     runSpacing: 8,
-                    children: _quickActions.map((action) => GestureDetector(
-                          onTap: () => _sendMessage(action),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 12, vertical: 8),
-                            decoration: BoxDecoration(
-                              color: AppColors.darkCard,
-                              borderRadius: BorderRadius.circular(20),
-                              border: Border.all(color: AppColors.darkBorder),
-                            ),
-                            child: Text(action,
-                                style: const TextStyle(
-                                    fontSize: 12, color: AppColors.darkText)),
-                          ),
-                        )).toList(),
+                    children: _quickActions
+                        .map((action) => GestureDetector(
+                              onTap: () => _sendMessage(action),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 12, vertical: 7),
+                                decoration: BoxDecoration(
+                                  color: AppColors.darkCard,
+                                  borderRadius: BorderRadius.circular(20),
+                                  border: Border.all(
+                                      color: AppColors.primary.withOpacity(0.3)),
+                                ),
+                                child: Text(action,
+                                    style: const TextStyle(
+                                        fontSize: 12,
+                                        color: AppColors.darkText)),
+                              ),
+                            ))
+                        .toList(),
                   ),
                 ],
               ),
-            ),
+            ).animate().fadeIn(),
 
           // Input field
           Container(
             padding: EdgeInsets.fromLTRB(
-                16, 8, 16, MediaQuery.of(context).padding.bottom + 8),
-            decoration: BoxDecoration(
+                12, 8, 12, MediaQuery.of(context).padding.bottom + 8),
+            decoration: const BoxDecoration(
               color: AppColors.darkCard,
-              border: const Border(
-                  top: BorderSide(color: AppColors.darkBorder)),
+              border: Border(top: BorderSide(color: AppColors.darkBorder)),
             ),
             child: Row(
               children: [
@@ -215,6 +235,9 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
                     controller: _messageController,
                     style: const TextStyle(
                         color: AppColors.darkText, fontSize: 14),
+                    maxLines: 4,
+                    minLines: 1,
+                    textInputAction: TextInputAction.newline,
                     decoration: InputDecoration(
                       hintText: 'Ask me anything about scams...',
                       hintStyle: TextStyle(
@@ -222,7 +245,7 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
                           fontSize: 13),
                       border: InputBorder.none,
                       contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 12),
+                          horizontal: 16, vertical: 10),
                       filled: true,
                       fillColor: AppColors.darkBg,
                       enabledBorder: OutlineInputBorder(
@@ -231,25 +254,34 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
                       ),
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(24),
-                        borderSide:
-                            const BorderSide(color: AppColors.primary, width: 2),
+                        borderSide: const BorderSide(
+                            color: AppColors.primary, width: 2),
                       ),
                     ),
-                    onSubmitted: _sendMessage,
                   ),
                 ),
                 const SizedBox(width: 8),
                 GestureDetector(
                   onTap: () => _sendMessage(_messageController.text),
-                  child: Container(
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
                     width: 44,
                     height: 44,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      gradient: AppColors.primaryGradient,
+                      gradient: _isLoading
+                          ? null
+                          : AppColors.primaryGradient,
+                      color: _isLoading ? AppColors.darkBorder : null,
                     ),
-                    child: const Icon(Icons.send_rounded,
-                        color: Colors.white, size: 20),
+                    child: _isLoading
+                        ? const Padding(
+                            padding: EdgeInsets.all(12),
+                            child: CircularProgressIndicator(
+                                color: AppColors.primary, strokeWidth: 2),
+                          )
+                        : const Icon(Icons.send_rounded,
+                            color: Colors.white, size: 20),
                   ),
                 ),
               ],
@@ -289,9 +321,10 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
-              children: [0, 1, 2].map((i) {
-                return Container(
-                  margin: const EdgeInsets.symmetric(horizontal: 2),
+              children: List.generate(
+                3,
+                (i) => Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 3),
                   width: 8,
                   height: 8,
                   decoration: const BoxDecoration(
@@ -311,8 +344,8 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
                       begin: const Offset(1.0, 1.0),
                       end: const Offset(0.5, 0.5),
                       duration: 600.ms,
-                    );
-              }).toList(),
+                    ),
+              ),
             ),
           ),
         ],
@@ -349,19 +382,28 @@ class _ChatBubble extends StatelessWidget {
           ],
           Flexible(
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
               decoration: BoxDecoration(
                 gradient: isUser ? AppColors.primaryGradient : null,
                 color: isUser ? null : AppColors.darkCard,
                 borderRadius: BorderRadius.only(
-                  topLeft: const Radius.circular(16),
-                  topRight: const Radius.circular(16),
-                  bottomLeft: Radius.circular(isUser ? 16 : 4),
-                  bottomRight: Radius.circular(isUser ? 4 : 16),
+                  topLeft: const Radius.circular(18),
+                  topRight: const Radius.circular(18),
+                  bottomLeft: Radius.circular(isUser ? 18 : 4),
+                  bottomRight: Radius.circular(isUser ? 4 : 18),
                 ),
                 border: isUser
                     ? null
                     : Border.all(color: AppColors.darkBorder),
+                boxShadow: [
+                  BoxShadow(
+                    color: isUser
+                        ? AppColors.primary.withOpacity(0.2)
+                        : Colors.black.withOpacity(0.1),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  )
+                ],
               ),
               child: Text(
                 message.content,
@@ -380,10 +422,12 @@ class _ChatBubble extends StatelessWidget {
               height: 32,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: AppColors.darkCard,
-                border: Border.all(color: AppColors.darkBorder),
+                color: AppColors.primary.withOpacity(0.15),
+                border: Border.all(
+                    color: AppColors.primary.withOpacity(0.3)),
               ),
-              child: const Icon(Icons.person, color: AppColors.darkSubtext, size: 16),
+              child: const Icon(Icons.person,
+                  color: AppColors.primary, size: 16),
             ),
           ],
         ],

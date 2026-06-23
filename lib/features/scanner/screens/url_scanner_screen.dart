@@ -158,13 +158,16 @@ class _UrlScannerScreenState extends ConsumerState<UrlScannerScreen> {
 
             const SizedBox(height: 16),
 
-            PrimaryButton(
-              label: _isAnalyzing ? 'Analyzing URL...' : 'Scan URL',
-              icon: _isAnalyzing ? null : Icons.radar,
-              isLoading: _isAnalyzing,
-              onPressed: _analyzeUrl,
-              backgroundColor: AppColors.secondary,
-            ).animate(delay: 200.ms).fadeIn(duration: 300.ms),
+            if (_isAnalyzing)
+              const ScanningAnimation(label: 'Analyzing URL reputation & safety...')
+            else
+              PrimaryButton(
+                label: 'Scan URL',
+                icon: Icons.radar,
+                isLoading: false,
+                onPressed: _analyzeUrl,
+                backgroundColor: AppColors.secondary,
+              ).animate(delay: 200.ms).fadeIn(duration: 300.ms),
 
             const SizedBox(height: 16),
 
@@ -210,10 +213,10 @@ class _UrlScannerScreenState extends ConsumerState<UrlScannerScreen> {
                   )).toList(),
             ),
 
-            const SizedBox(height: 24),
+            if (!_isAnalyzing) const SizedBox(height: 24),
 
             // Results
-            if (_result != null) _buildUrlResults(_result!),
+            if (_result != null && !_isAnalyzing) _buildUrlResults(_result!),
           ],
         ),
       ),

@@ -1,17 +1,24 @@
 package com.trustshield.ai
 
+import android.content.ComponentName
+import android.content.Intent
+import android.net.Uri
+import android.os.Build
+import android.provider.Settings
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.EventChannel
+import io.flutter.plugin.common.MethodChannel
 
 class MainActivity : FlutterActivity() {
 
     private val NOTIFICATION_CHANNEL = "com.trustshield.ai/notifications"
+    private val PERMISSIONS_CHANNEL = "com.trustshield.ai/permissions"
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
 
-        // EventChannel for notification data from Android → Flutter
+        // EventChannel: Android notification events → Flutter (when app is open)
         EventChannel(flutterEngine.dartExecutor.binaryMessenger, NOTIFICATION_CHANNEL)
             .setStreamHandler(object : EventChannel.StreamHandler {
                 override fun onListen(arguments: Any?, events: EventChannel.EventSink?) {
@@ -23,36 +30,57 @@ class MainActivity : FlutterActivity() {
                 }
             })
 
-        // MethodChannel for permission requests
-        io.flutter.plugin.common.MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "com.trustshield.ai/permissions")
+        // MethodChannel: Flutter → Android for permission management
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, PERMISSIONS_CHANNEL)
             .setMethodCallHandler { call, result ->
                 when (call.method) {
-                    "requestNotificationListenerPermission" -> {
-                        val intent = android.content.Intent("android.settings.ACTION_NOTIFICATION_LISTENER_SETTINGS")
-                        startActivity(intent)
-                        result.success(true)
-                    }
+
                     "isNotificationListenerGranted" -> {
-                        val componentName = android.content.ComponentName(context, TrustShieldNotificationService::class.java)
-                        val enabledListeners = android.provider.Settings.Secure.getString(context.contentResolver, "enabled_notification_listeners")
-                        val isEnabled = enabledListeners != null && enabledListeners.contains(componentName.flattenToString())
-                        result.success(isEnabled)
+                        result.success(isNotificationListenerEnabled())
                     }
-                    "requestOverlayPermission" -> {
-                        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
-                            if (!android.provider.Settings.canDrawOverlays(context)) {
-                                val intent = android.content.Intent(android.provider.Settings.ACTION_MANAGE_OVERLAY_PERMISSION, android.net.Uri.parse("package:" + context.packageName))
-                                startActivity(intent)
-                                result.success(true)
-                            } else {
-                                result.success(true)
-                            }
-                        } else {
+
+                    "requestNotificationListenerPermission" -> {
+                        try {
+                            val intent = Intent("android.settings.ACTION_NOTIFICATION_LISTENER_SETTINGS")
+                            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            startActivity(intent)
                             result.success(true)
+                        } catch (e: Exception) {
+                            result.error("SETTINGS_ERROR", e.message, null)
                         }
                     }
+
+                    "requestOverlayPermission" -> {
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                            if (!Settings.canDrawOverlays(context)) {
+                                val intent = Intent(
+                                    Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                                    Uri.parse("package:${context.packageName}")
+                                )
+                                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                startActivity(intent)
+                            }
+                        }
+                        result.success(true)
+                    }
+
+                    "requestPostNotificationsPermission" -> {
+                        // Android 13+ POST_NOTIFICATIONS permission is handled by permission_handler
+                        result.success(true)
+                    }
+
                     else -> result.notImplemented()
                 }
             }
+    }
+
+    private fun isNotificationListenerEnabled(): Boolean {
+        val componentName = ComponentName(context, TrustShieldNotificationService::class.java)
+        val enabledListeners = Settings.Secure.getString(
+            contentResolver,
+            "enabled_notification_listeners"
+        )
+        return enabledListeners != null &&
+                enabledListeners.contains(componentName.flattenToString())
     }
 }

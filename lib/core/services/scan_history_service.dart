@@ -40,15 +40,15 @@ class ScanHistoryService {
           .collection('scans')
           .add(sanitized);
 
-      // Update user stats
-      await _firestore.collection('users').doc(result.userId).update({
+      // Update user stats — use set(merge:true) so it works even if user doc doesn't exist yet
+      await _firestore.collection('users').doc(result.userId).set({
         'totalScans': FieldValue.increment(1),
         'threatsDetected': result.threatLevel == ThreatLevel.high ||
                 result.threatLevel == ThreatLevel.critical
             ? FieldValue.increment(1)
             : FieldValue.increment(0),
         'lastSeen': Timestamp.now(),
-      });
+      }, SetOptions(merge: true));
     } catch (e) {
       // Silently fail - don't block user flow for analytics
     }

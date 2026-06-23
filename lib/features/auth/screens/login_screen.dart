@@ -6,6 +6,7 @@ import '../../../core/theme/app_theme.dart';
 import '../services/auth_service.dart';
 import '../../../core/widgets/glass_card.dart';
 import '../../../core/widgets/primary_button.dart';
+import '../../../core/services/background_service.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -39,7 +40,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         email: _emailController.text.trim(),
         password: _passwordController.text,
       );
-      if (mounted) context.go('/home');
+      if (mounted) {
+        await _requestPermissionsAndProceed();
+      }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -59,7 +62,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     try {
       final authService = ref.read(authServiceProvider);
       await authService.signInWithGoogle();
-      if (mounted) context.go('/home');
+      if (mounted) {
+        await _requestPermissionsAndProceed();
+      }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -72,6 +77,131 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     } finally {
       if (mounted) setState(() => _isGoogleLoading = false);
     }
+  }
+
+  /// Shows permission dialog then navigates to home
+  Future<void> _requestPermissionsAndProceed() async {
+    final bgService = ref.read(backgroundServiceProvider);
+    final isGranted = await bgService.isNotificationListenerGranted();
+
+    if (!isGranted && mounted) {
+      // Show permission dialog
+      final granted = await showDialog<bool>(
+        context: context,
+        barrierDismissible: false,
+        builder: (ctx) => AlertDialog(
+          backgroundColor: AppColors.darkCard,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          title: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: AppColors.primary.withOpacity(0.15),
+                ),
+                child: const Icon(Icons.shield, color: AppColors.primary, size: 24),
+              ),
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Text(
+                  'Enable Background Protection',
+                  style: TextStyle(
+                    color: AppColors.darkText,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'TrustShield AI can monitor your notifications to detect scams in real-time — even when the app is closed.',
+                style: TextStyle(color: AppColors.darkSubtext, height: 1.5),
+              ),
+              const SizedBox(height: 16),
+              _buildPermissionFeature(
+                Icons.notifications_active,
+                'Real-time scam detection',
+                'Scans WhatsApp, SMS, Gmail, Telegram',
+              ),
+              const SizedBox(height: 8),
+              _buildPermissionFeature(
+                Icons.warning_amber,
+                'Instant threat alerts',
+                'Get notified before you respond',
+              ),
+              const SizedBox(height: 8),
+              _buildPermissionFeature(
+                Icons.lock_outline,
+                'Privacy-first design',
+                'Messages are analyzed locally, never stored',
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: Text('Skip for now',
+                  style: TextStyle(color: AppColors.darkSubtext)),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Enable Protection'),
+            ),
+          ],
+        ),
+      );
+
+      if (granted == true && mounted) {
+        await bgService.requestNotificationListenerPermission();
+        // Small delay to let system settings open
+        await Future.delayed(const Duration(milliseconds: 500));
+      }
+    }
+
+    if (mounted) context.go('/home');
+  }
+
+  Widget _buildPermissionFeature(IconData icon, String title, String subtitle) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, color: AppColors.primary, size: 18),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(title,
+                  style: const TextStyle(
+                    color: AppColors.darkText,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  )),
+              Text(subtitle,
+                  style: TextStyle(
+                    color: AppColors.darkSubtext,
+                    fontSize: 11,
+                  )),
+            ],
+          ),
+        ),
+      ],
+    );
   }
 
   @override
