@@ -22,7 +22,7 @@ jobs:
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.24.0'
+          flutter-version: '3.27.0'
           channel: 'stable'
           cache: true
 
@@ -35,7 +35,7 @@ jobs:
         run: flutter pub get
 
       - name: Build APK
-        run: flutter build apk --release --no-tree-shake-icons 2>&1 | tee build_log.txt; exit ${PIPESTATUS[0]}
+        run: flutter build apk --release --no-tree-shake-icons
 
       - name: Upload Build Log on Failure
         if: failure()
