@@ -136,7 +136,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                   shaderCallback: (b) =>
                       AppColors.primaryGradient.createShader(b),
                   child: Text(
-                    'Hello, ${_firstName(user?.displayName)} 👋',
+                    'Hello, ${_displayName(user?.displayName, user?.email)} 👋',
                     style: const TextStyle(
                       fontSize: 26,
                       fontWeight: FontWeight.w800,
@@ -549,9 +549,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     ).animate(delay: 500.ms).fadeIn(duration: 400.ms).slideY(begin: 0.2);
   }
 
-  String _firstName(String? displayName) {
-    if (displayName == null || displayName.trim().isEmpty) return 'User';
-    return displayName.trim().split(' ').first;
+  String _displayName(String? displayName, String? email) {
+    if (displayName != null && displayName.trim().isNotEmpty) {
+      return displayName.trim().split(' ').first;
+    }
+    if (email != null && email.trim().isNotEmpty) {
+      return email.split('@').first;
+    }
+    return 'User';
   }
 
   String _formatTime(DateTime? dt) {

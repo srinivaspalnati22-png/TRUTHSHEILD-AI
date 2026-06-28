@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  deploy-web:
+  build-web:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -34,23 +34,6 @@ jobs:
             --release \
             --no-tree-shake-icons \
             --dart-define=GEMINI_API_KEY=AIzaSyCfhZgzhfXEhOv8pWOnmvp_IRS_xtfgZXk
-
-      - name: Deploy to Firebase Hosting
-        # Only deploy if the service account secret is configured
-        if: ${{ secrets.FIREBASE_SERVICE_ACCOUNT != '' }}
-        uses: FirebaseExtended/action-hosting-deploy@v0
-        with:
-          repoToken: '${{ secrets.GITHUB_TOKEN }}'
-          firebaseServiceAccount: '${{ secrets.FIREBASE_SERVICE_ACCOUNT }}'
-          channelId: live
-          projectId: trustshieldai-8f2fd
-
-      - name: Skip deploy (no service account configured)
-        if: ${{ secrets.FIREBASE_SERVICE_ACCOUNT == '' }}
-        run: |
-          echo "⚠️ Skipping Firebase Hosting deploy."
-          echo "To enable, add FIREBASE_SERVICE_ACCOUNT to GitHub Secrets."
-          echo "✅ Web build was successful - artifacts available."
 
       - name: Upload web build as artifact
         uses: actions/upload-artifact@v4

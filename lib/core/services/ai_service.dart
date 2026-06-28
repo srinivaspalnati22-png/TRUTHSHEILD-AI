@@ -10,8 +10,8 @@ class AIService {
   static const String _baseUrl =
       'https://generativelanguage.googleapis.com/v1beta/models';
 
-  // ✅ FREE model — works without billing
-  static const String _model = 'gemini-1.5-flash';
+  // ✅ FREE model — gemini-2.0-flash is the current recommended free tier model
+  static const String _model = 'gemini-2.0-flash';
 
   // API key: loaded from build-time env var, falls back to default
   static const String _apiKey = String.fromEnvironment(
