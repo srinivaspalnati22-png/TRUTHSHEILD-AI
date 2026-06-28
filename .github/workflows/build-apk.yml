@@ -42,6 +42,7 @@ jobs:
         run: |
           echo "flutter.sdk=$FLUTTER_ROOT" > android/local.properties
           echo "sdk.dir=$ANDROID_SDK_ROOT" >> android/local.properties
+          echo "GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}" >> android/local.properties
 
       - name: Get Flutter dependencies
         run: flutter pub get
@@ -53,7 +54,9 @@ jobs:
           keytool -list -v -keystore ~/.android/debug.keystore -alias androiddebugkey -storepass android | grep SHA1
 
       - name: Build Release APK
-        run: flutter build apk --release --split-per-abi --no-tree-shake-icons
+        run: |
+          flutter build apk --release --split-per-abi --no-tree-shake-icons \
+            --dart-define=GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}
       
       - name: Upload APK artifacts
         uses: actions/upload-artifact@v4
@@ -100,6 +103,7 @@ jobs:
         run: |
           echo "flutter.sdk=$FLUTTER_ROOT" > android/local.properties
           echo "sdk.dir=$ANDROID_SDK_ROOT" >> android/local.properties
+          echo "GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}" >> android/local.properties
 
       - name: Get Flutter dependencies
         run: flutter pub get
@@ -110,7 +114,9 @@ jobs:
           keytool -genkey -v -keystore ~/.android/debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "C=US, O=Android, CN=Android Debug" || true
 
       - name: Build Release AAB
-        run: flutter build appbundle --release --no-tree-shake-icons
+        run: |
+          flutter build appbundle --release --no-tree-shake-icons \
+            --dart-define=GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}
       
       - name: Upload AAB artifact
         uses: actions/upload-artifact@v4
