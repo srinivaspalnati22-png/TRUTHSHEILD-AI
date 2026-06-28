@@ -13,10 +13,11 @@ class AIService {
   // ✅ FREE model — works without billing
   static const String _model = 'gemini-1.5-flash';
 
-  // ✅ API key loaded from build-time environment variable (never stored in code)
-  // Build with: flutter run --dart-define=GEMINI_API_KEY=AIzaSy...
-  static const String _apiKey =
-      String.fromEnvironment('GEMINI_API_KEY', defaultValue: '');
+  // API key: loaded from build-time env var, falls back to default
+  static const String _apiKey = String.fromEnvironment(
+    'GEMINI_API_KEY',
+    defaultValue: 'AIzaSyCfhZgzhfXEhOv8pWOnmvp_IRS_xtfgZXk',
+  );
 
   final FirebaseFunctions _functions = FirebaseFunctions.instance;
 
