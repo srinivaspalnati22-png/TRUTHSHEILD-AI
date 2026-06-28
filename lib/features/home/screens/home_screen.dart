@@ -554,7 +554,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       return displayName.trim().split(' ').first;
     }
     if (email != null && email.trim().isNotEmpty) {
-      return email.split('@').first;
+      // Get the part before @, and remove any numbers (e.g., lucky2@gmail.com -> lucky)
+      String prefix = email.split('@').first;
+      return prefix.replaceAll(RegExp(r'[0-9]'), '');
     }
     return 'User';
   }
