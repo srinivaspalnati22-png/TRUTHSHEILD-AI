@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base href="$FLUTTER_BASE_HREF">
+
+  <meta charset="UTF-8">
+  <meta content="IE=Edge" http-equiv="X-UA-Compatible">
+  <meta name="description" content="TrustShield AI — AI-Powered Scam Detection & Digital Trust Platform for Indian users. Detect job fraud, phishing, fake offers instantly.">
+  <meta name="keywords" content="scam detection, AI, fraud protection, phishing, job fraud, TrustShield">
+
+  <!-- iOS meta tags & icons -->
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="TrustShield AI">
+  <link rel="apple-touch-icon" href="icons/Icon-192.png">
+
+  <!-- Open Graph -->
+  <meta property="og:title" content="TrustShield AI">
+  <meta property="og:description" content="AI-Powered Scam Detection & Digital Trust Platform">
+  <meta property="og:image" content="icons/Icon-512.png">
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/png" href="favicon.png"/>
+
+  <title>TrustShield AI — Scam Detection</title>
+  <link rel="manifest" href="manifest.json">
+
+  <style>
+    body {
+      background-color: #0B1220;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+    }
+    #loading {
+      text-align: center;
+      color: #6C63FF;
+      font-family: sans-serif;
+    }
+    #loading-spinner {
+      width: 48px;
+      height: 48px;
+      border: 4px solid rgba(108,99,255,0.2);
+      border-top-color: #6C63FF;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin: 0 auto 16px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+  <div id="loading">
+    <div id="loading-spinner"></div>
+    <p>🛡️ TrustShield AI loading...</p>
+  </div>
+  <script src="flutter_bootstrap.js" async></script>
+  <script>
+    window.addEventListener('flutter-first-frame', function() {
+      document.getElementById('loading').style.display = 'none';
+    });
+  </script>
+</body>
+</html>
