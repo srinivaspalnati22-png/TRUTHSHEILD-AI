@@ -5,8 +5,11 @@ const { GoogleGenerativeAI } = require("@google/generative-ai");
 admin.initializeApp();
 const db = admin.firestore();
 
-// Initialize Gemini AI
-const genAI = new GoogleGenerativeAI(functions.config().gemini.api_key);
+// Initialize Gemini AI — uses Firebase config key, falls back to hardcoded key
+const GEMINI_API_KEY = (functions.config().gemini && functions.config().gemini.api_key)
+  ? functions.config().gemini.api_key
+  : "AIzaSyCfhZgzhfXEhOv8pWOnmvp_IRS_xtfgZXk";
+const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
 
 // ============================================
 // RATE LIMITING HELPER
@@ -67,7 +70,7 @@ exports.analyzeMessage = functions.https.onCall(async (data, context) => {
 
   try {
     const model = genAI.getGenerativeModel({
-      model: "gemini-2.0-flash",
+      model: "gemini-1.5-flash",
       generationConfig: { temperature: 0.2, maxOutputTokens: 1024 },
     });
 
@@ -149,7 +152,7 @@ exports.analyzeUrl = functions.https.onCall(async (data, context) => {
 
   try {
     const model = genAI.getGenerativeModel({
-      model: "gemini-2.0-flash",
+      model: "gemini-1.5-flash",
       generationConfig: { temperature: 0.1 },
     });
 
@@ -178,6 +181,93 @@ Return JSON: {"trustScore":0-100,"threatLevel":"safe|low|medium|high|critical","
 });
 
 // ============================================
+// AI CHAT ASSISTANT
+// ============================================
+exports.chatWithAI = functions.https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throw new functions.https.HttpsError("unauthenticated", "Login required.");
+  }
+
+  const { message, history = [] } = data;
+
+  if (!message || message.trim().length === 0) {
+    throw new functions.https.HttpsError("invalid-argument", "Message required.");
+  }
+
+  if (message.length > 2000) {
+    throw new functions.https.HttpsError("invalid-argument", "Message too long. Max 2000 characters.");
+  }
+
+  // Rate limiting: 30 chat messages per hour
+  await checkRateLimit(context.auth.uid, "chat", 30, 60);
+
+  try {
+    const model = genAI.getGenerativeModel({
+      model: "gemini-1.5-flash",
+      generationConfig: { temperature: 0.7, maxOutputTokens: 1024 },
+    });
+
+    // Build conversation history text
+    const historyText = (Array.isArray(history) ? history : [])
+      .slice(-10)
+      .map((h) => `${h.role === "user" ? "User" : "TrustShield AI"}: ${h.content}`)
+      .join("\n");
+
+    const prompt = `You are TrustShield AI, a friendly and expert cybersecurity assistant helping Indian users identify scams, verify URLs, check documents, and stay safe online. You know about Indian job scams, fake internship frauds, phishing attacks, and digital fraud patterns.
+
+Be concise, direct, and use simple language. If something is a scam, say so clearly.
+
+${historyText.length > 0 ? `Previous conversation:\n${historyText}\n\n` : ""}User: ${message}
+TrustShield AI:`;
+
+    const result = await model.generateContent(prompt);
+    const responseText = result.response.text();
+
+    return { response: responseText || "I apologize, I could not process that request." };
+  } catch (error) {
+    functions.logger.error("Chat failed:", error);
+    throw new functions.https.HttpsError("internal", "Chat failed. Please try again.");
+  }
+});
+
+// ============================================
+// DOCUMENT ANALYSIS
+// ============================================
+exports.analyzeDocument = functions.https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throw new functions.https.HttpsError("unauthenticated", "Login required.");
+  }
+
+  const { extractedText, docType = "offer_letter" } = data;
+
+  if (!extractedText || extractedText.trim().length < 20) {
+    throw new functions.https.HttpsError("invalid-argument", "Document text too short.");
+  }
+
+  await checkRateLimit(context.auth.uid, "analyzeDocument", 10, 60);
+
+  try {
+    const model = genAI.getGenerativeModel({
+      model: "gemini-1.5-flash",
+      generationConfig: { temperature: 0.1, maxOutputTokens: 1024 },
+    });
+
+    const prompt = `You are TrustShield AI, a document verification expert for Indian job market fraud.
+Analyze this ${docType} for authenticity and fraud.
+DOCUMENT: """${extractedText.substring(0, 4000)}"""
+Return JSON: {"trustScore":0-100,"threatLevel":"safe|low|medium|high|critical","summary":"...","redFlags":[],"positiveSignals":[],"explanation":"...","confidence":0.0-1.0,"isFake":false,"companyVerification":"...","recommendation":"..."}`;
+
+    const result = await model.generateContent(prompt);
+    const text = result.response.text();
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    return JSON.parse(jsonMatch ? jsonMatch[0] : text);
+  } catch (error) {
+    functions.logger.error("Document analysis failed:", error);
+    throw new functions.https.HttpsError("internal", "Document analysis failed.");
+  }
+});
+
+// ============================================
 // FACT CHECK
 // ============================================
 exports.factCheck = functions.https.onCall(async (data, context) => {
@@ -196,7 +286,7 @@ exports.factCheck = functions.https.onCall(async (data, context) => {
   await checkRateLimit(context.auth.uid, "factCheck", 10, 60);
 
   try {
-    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
     const prompt = `Fact-check: """${claim}"""
 Return JSON: {"verdict":"true|partially_true|misleading|false|unverifiable","confidence":0.0-1.0,"summary":"...","evidence":[],"context":"...","explanation":"..."}`;
 

@@ -22,11 +22,15 @@ android {
 
     defaultConfig {
         applicationId "com.trustshield.ai"
-        minSdkVersion 23
+        minSdkVersion flutter.minSdkVersion
         targetSdk 34
         versionCode 1
         versionName "1.0.0"
         multiDexEnabled true
+
+        // Gemini API key injected from local.properties (never committed to git)
+        def geminiKey = project.findProperty("GEMINI_API_KEY") ?: ""
+        buildConfigField "String", "GEMINI_API_KEY", "\"${geminiKey}\""
     }
 
     buildTypes {

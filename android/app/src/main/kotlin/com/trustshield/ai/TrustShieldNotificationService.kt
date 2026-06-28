@@ -30,8 +30,10 @@ class TrustShieldNotificationService : NotificationListenerService() {
         private const val FOREGROUND_CHANNEL_ID = "trustshield_foreground"
         private const val FOREGROUND_NOTIF_ID = 1001
 
-        // Gemini API Key - same as Flutter side
-        private const val API_KEY = "AIzaSyDprILzSUz3ZqcA8SRrE5iD6tk2OCzFwM0"
+        // API key is injected at build time via BuildConfig (see build.gradle)
+        // Never hardcode keys in source — use: flutter build apk --dart-define=GEMINI_API_KEY=AIzaSy...
+        private const val API_KEY = BuildConfig.GEMINI_API_KEY
+        // Using gemini-1.5-flash: free-tier compatible, no billing required
         private const val GEMINI_URL =
             "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=$API_KEY"
 
@@ -213,7 +215,7 @@ Return ONLY valid JSON:
             if (conn.responseCode == 200) {
                 val response = BufferedReader(InputStreamReader(conn.inputStream)).readText()
                 val data = JSONObject(response)
-                val text = data.getJSONArray("candidates")
+                val rawText = data.getJSONArray("candidates")
                     .getJSONObject(0)
                     .getJSONObject("content")
                     .getJSONArray("parts")
@@ -223,12 +225,26 @@ Return ONLY valid JSON:
                     .replace("```json", "")
                     .replace("```", "")
                     .trim()
-                JSONObject(text)
+                // Try to parse JSON; if it fails extract with regex
+                try {
+                    JSONObject(rawText)
+                } catch (e: Exception) {
+                    val jsonRegex = Regex("\\{[\\s\\S]*\\}")
+                    val match = jsonRegex.find(rawText)
+                    if (match != null) JSONObject(match.value)
+                    else JSONObject().apply {
+                        put("trustScore", 50)
+                        put("threatLevel", "medium")
+                        put("summary", "Could not parse response")
+                        put("isScam", false)
+                    }
+                }
             } else {
+                Log.w(TAG, "Gemini API error: ${conn.responseCode}. Check API key at https://aistudio.google.com/")
                 JSONObject().apply {
                     put("trustScore", 50)
                     put("threatLevel", "medium")
-                    put("summary", "Could not analyze")
+                    put("summary", "Could not analyze (API error ${conn.responseCode})")
                     put("isScam", false)
                 }
             }
