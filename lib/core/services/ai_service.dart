@@ -13,11 +13,8 @@ class AIService {
   // ✅ FREE model — gemini-2.0-flash is the current recommended free tier model
   static const String _model = 'gemini-2.0-flash';
 
-  // API key: loaded from build-time env var, falls back to default
-  static const String _apiKey = String.fromEnvironment(
-    'GEMINI_API_KEY',
-    defaultValue: 'AIzaSyCNTCGKVGh8z2JVLrwvJzjRwuTouTOy1Hg',
-  );
+  // API key: Hardcoded strictly to ensure the new key is used (ignoring GitHub Secrets)
+  static const String _apiKey = 'AIzaSyCNTCGKVGh8z2JVLrwvJzjRwuTouTOy1Hg';
 
   final FirebaseFunctions _functions = FirebaseFunctions.instance;
 
