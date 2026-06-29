@@ -33,7 +33,7 @@ jobs:
           flutter build web \
             --release \
             --no-tree-shake-icons \
-            --dart-define=GEMINI_API_KEY=AIzaSyCNTCGKVGh8z2JVLrwvJzjRwuTouTOy1Hg
+            --dart-define=GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}
 
       - name: Upload web build as artifact
         uses: actions/upload-artifact@v4

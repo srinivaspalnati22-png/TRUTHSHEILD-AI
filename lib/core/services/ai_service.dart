@@ -1,20 +1,17 @@
 import 'dart:convert';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:http/http.dart' as http;
+import 'package:google_generative_ai/google_generative_ai.dart';
 import '../../features/scanner/models/scan_result.dart';
 
 final aiServiceProvider = Provider<AIService>((ref) => AIService());
 
 class AIService {
-  static const String _baseUrl =
-      'https://generativelanguage.googleapis.com/v1beta/models';
-
   // ✅ FREE model — gemini-2.0-flash is the current recommended free tier model
-  static const String _model = 'gemini-2.0-flash';
+  static const String _modelName = 'gemini-2.0-flash';
 
-  // API key: Hardcoded strictly to ensure the new key is used (ignoring GitHub Secrets)
-  static const String _apiKey = 'AIzaSyCNTCGKVGh8z2JVLrwvJzjRwuTouTOy1Hg';
+  // API key: strictly loaded from environment variables (never hardcoded)
+  static const String _apiKey = String.fromEnvironment('GEMINI_API_KEY', defaultValue: '');
 
   final FirebaseFunctions _functions = FirebaseFunctions.instance;
 
@@ -183,152 +180,110 @@ class AIService {
   // PRIVATE: Build user-friendly API error message
   // ─────────────────────────────────────────────
   String _getApiKeyErrorMessage(String error) {
-    if (error.contains('403') || error.contains('API_KEY_INVALID')) {
-      return '⚠️ API Key Issue: The Gemini API key is invalid.\n\n'
-          'Please get a FREE valid key at:\n'
-          'https://aistudio.google.com/app/apikey\n\n'
-          'Valid keys start with "AIza..."';
+    if (error.contains('API_KEY_INVALID') || error.contains('403')) {
+      return '⚠️ Authentication Error: The Gemini API key provided is invalid or unauthorized.\n\n'
+          'Please ensure a valid Google Gemini API key is configured.';
     }
-    if (error.contains('429')) {
-      return '⏳ Rate limit reached. Please wait a minute and try again.';
+    if (error.contains('429') || error.contains('quota')) {
+      return '⏳ Rate limit reached. The AI service is currently busy. Please wait a minute and try again.';
     }
-    return 'Sorry, I encountered an error: $error';
+    if (error.contains('network') || error.contains('Failed host lookup')) {
+      return '🌐 Network Error: Unable to connect to the AI service. Please check your internet connection.';
+    }
+    return 'Sorry, I encountered an unexpected error: $error';
   }
 
   // ─────────────────────────────────────────────
-  // PRIVATE: Call Gemini — JSON response mode
+  // PRIVATE: Call Gemini SDK — JSON response mode
   // ─────────────────────────────────────────────
   Future<Map<String, dynamic>> _callGeminiJson(String prompt) async {
+    if (_apiKey.isEmpty) {
+      throw Exception('API_KEY_INVALID: No API key found.');
+    }
+
     try {
-      final url = Uri.parse('$_baseUrl/$_model:generateContent?key=$_apiKey');
-      final body = jsonEncode({
-        'contents': [
-          {
-            'parts': [
-              {'text': prompt}
-            ]
-          }
+      final model = GenerativeModel(
+        model: _modelName,
+        apiKey: _apiKey,
+        generationConfig: GenerationConfig(
+          temperature: 0.1,
+          maxOutputTokens: 2048,
+          responseMimeType: 'application/json',
+        ),
+        safetySettings: [
+          SafetySetting(
+            HarmCategory.dangerousContent,
+            HarmBlockThreshold.none,
+          ),
         ],
-        'generationConfig': {
-          'temperature': 0.1,
-          'maxOutputTokens': 2048,
-          'responseMimeType': 'application/json',
-        },
-        'safetySettings': [
-          {
-            'category': 'HARM_CATEGORY_DANGEROUS_CONTENT',
-            'threshold': 'BLOCK_NONE'
-          }
-        ],
-      });
+      );
 
-      final response = await http
-          .post(
-            url,
-            headers: {'Content-Type': 'application/json'},
-            body: body,
-          )
-          .timeout(const Duration(seconds: 30));
-
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        String text =
-            data['candidates']?[0]?['content']?['parts']?[0]?['text'] ?? '{}';
-        text = text
-            .replaceAll('```json', '')
-            .replaceAll('```', '')
-            .trim();
-        try {
-          final parsed = jsonDecode(text) as Map<String, dynamic>;
-          return {'text': text, 'raw': parsed};
-        } catch (_) {
-          final jsonMatch = RegExp(r'\{[\s\S]*\}').firstMatch(text);
-          if (jsonMatch != null) {
-            try {
-              final parsed =
-                  jsonDecode(jsonMatch.group(0)!) as Map<String, dynamic>;
-              return {'text': text, 'raw': parsed};
-            } catch (_) {}
-          }
-          return {'text': text, 'raw': <String, dynamic>{}};
+      final content = [Content.text(prompt)];
+      final response = await model.generateContent(content);
+      
+      String text = response.text ?? '{}';
+      text = text.replaceAll('```json', '').replaceAll('```', '').trim();
+      
+      try {
+        final parsed = jsonDecode(text) as Map<String, dynamic>;
+        return {'text': text, 'raw': parsed};
+      } catch (_) {
+        final jsonMatch = RegExp(r'\{[\s\S]*\}').firstMatch(text);
+        if (jsonMatch != null) {
+          try {
+            final parsed =
+                jsonDecode(jsonMatch.group(0)!) as Map<String, dynamic>;
+            return {'text': text, 'raw': parsed};
+          } catch (_) {}
         }
-      } else if (response.statusCode == 400) {
-        // Try to extract error message from body
-        try {
-          final errData = jsonDecode(response.body);
-          final msg =
-              errData['error']?['message'] as String? ?? 'Bad request (400)';
-          throw Exception(msg);
-        } catch (parseErr) {
-          if (parseErr is Exception) rethrow;
-          throw Exception('Bad request (400). Check your API key format.');
-        }
-      } else if (response.statusCode == 403) {
-        throw Exception(
-            'API key invalid or access denied (403). '
-            'Get a free key at https://aistudio.google.com/app/apikey');
-      } else if (response.statusCode == 429) {
-        throw Exception('Rate limit reached. Please wait and try again.');
-      } else {
-        throw Exception(
-            'AI service error (${response.statusCode}). Please try again.');
+        return {'text': text, 'raw': <String, dynamic>{}};
       }
+    } on GenerativeAIException catch (e) {
+      if (e.message.contains('403')) throw Exception('403: API key invalid.');
+      if (e.message.contains('429') || e.message.contains('quota')) {
+        throw Exception('429: Rate limit reached.');
+      }
+      throw Exception('SDK Error: ${e.message}');
     } catch (e) {
-      if (e is Exception) rethrow;
-      throw Exception(
-          'Network error: Please check your internet connection.');
+      throw Exception('Error: $e');
     }
   }
 
   // ─────────────────────────────────────────────
-  // PRIVATE: Call Gemini — plain text mode (chat)
+  // PRIVATE: Call Gemini SDK — plain text mode (chat)
   // ─────────────────────────────────────────────
   Future<String> _callGeminiText(String prompt) async {
+    if (_apiKey.isEmpty) {
+      throw Exception('API_KEY_INVALID: No API key found.');
+    }
+
     try {
-      final url = Uri.parse('$_baseUrl/$_model:generateContent?key=$_apiKey');
-      final body = jsonEncode({
-        'contents': [
-          {
-            'parts': [
-              {'text': prompt}
-            ]
-          }
+      final model = GenerativeModel(
+        model: _modelName,
+        apiKey: _apiKey,
+        generationConfig: GenerationConfig(
+          temperature: 0.7,
+          maxOutputTokens: 1024,
+        ),
+        safetySettings: [
+          SafetySetting(
+            HarmCategory.dangerousContent,
+            HarmBlockThreshold.none,
+          ),
         ],
-        'generationConfig': {
-          'temperature': 0.7,
-          'maxOutputTokens': 1024,
-        },
-        'safetySettings': [
-          {
-            'category': 'HARM_CATEGORY_DANGEROUS_CONTENT',
-            'threshold': 'BLOCK_NONE'
-          }
-        ],
-      });
+      );
 
-      final response = await http
-          .post(
-            url,
-            headers: {'Content-Type': 'application/json'},
-            body: body,
-          )
-          .timeout(const Duration(seconds: 30));
-
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        return data['candidates']?[0]?['content']?['parts']?[0]?['text'] ?? '';
-      } else if (response.statusCode == 403) {
-        throw Exception('403: API key invalid.');
-      } else if (response.statusCode == 400) {
-        throw Exception('400: Bad request — check API key format.');
-      } else if (response.statusCode == 429) {
+      final content = [Content.text(prompt)];
+      final response = await model.generateContent(content);
+      return response.text ?? '';
+    } on GenerativeAIException catch (e) {
+      if (e.message.contains('403')) throw Exception('403: API key invalid.');
+      if (e.message.contains('429') || e.message.contains('quota')) {
         throw Exception('429: Rate limit reached.');
-      } else {
-        throw Exception('Error ${response.statusCode}');
       }
+      throw Exception('SDK Error: ${e.message}');
     } catch (e) {
-      if (e is Exception) rethrow;
-      throw Exception('Network error.');
+      throw Exception('Error: $e');
     }
   }
 
