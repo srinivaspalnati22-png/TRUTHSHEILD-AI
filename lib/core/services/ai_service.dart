@@ -23,7 +23,6 @@ class AIService {
     required String content,
     String contentType = 'message',
   }) async {
-    // Try Cloud Function first (if deployed), then direct API
     try {
       final callable = _functions.httpsCallable(
         'analyzeMessage',
@@ -40,16 +39,19 @@ class AIService {
         raw: raw,
         scanType: ScanType.message,
       );
-    } on FirebaseFunctionsException {
-      // Fallback: direct Gemini API
-      final prompt = _buildMessageAnalysisPrompt(content, contentType);
-      final response = await _callGeminiJson(prompt);
-      return _parseScanResult(
-        userId: userId,
-        content: content,
-        response: response,
-        scanType: ScanType.message,
-      );
+    } catch (_) {
+      try {
+        final prompt = _buildMessageAnalysisPrompt(content, contentType);
+        final response = await _callGeminiJson(prompt);
+        return _parseScanResult(
+          userId: userId,
+          content: content,
+          response: response,
+          scanType: ScanType.message,
+        );
+      } catch (e) {
+        throw Exception(_getApiKeyErrorMessage(e.toString()));
+      }
     }
   }
 
@@ -73,15 +75,19 @@ class AIService {
         raw: raw,
         scanType: ScanType.url,
       );
-    } on FirebaseFunctionsException {
-      final prompt = _buildUrlAnalysisPrompt(url);
-      final response = await _callGeminiJson(prompt);
-      return _parseScanResult(
-        userId: userId,
-        content: url,
-        response: response,
-        scanType: ScanType.url,
-      );
+    } catch (_) {
+      try {
+        final prompt = _buildUrlAnalysisPrompt(url);
+        final response = await _callGeminiJson(prompt);
+        return _parseScanResult(
+          userId: userId,
+          content: url,
+          response: response,
+          scanType: ScanType.url,
+        );
+      } catch (e) {
+        throw Exception(_getApiKeyErrorMessage(e.toString()));
+      }
     }
   }
 
@@ -109,15 +115,19 @@ class AIService {
         raw: raw,
         scanType: ScanType.document,
       );
-    } on FirebaseFunctionsException {
-      final prompt = _buildDocumentAnalysisPrompt(extractedText, docType);
-      final response = await _callGeminiJson(prompt);
-      return _parseScanResult(
-        userId: userId,
-        content: extractedText,
-        response: response,
-        scanType: ScanType.document,
-      );
+    } catch (_) {
+      try {
+        final prompt = _buildDocumentAnalysisPrompt(extractedText, docType);
+        final response = await _callGeminiJson(prompt);
+        return _parseScanResult(
+          userId: userId,
+          content: extractedText,
+          response: response,
+          scanType: ScanType.document,
+        );
+      } catch (e) {
+        throw Exception(_getApiKeyErrorMessage(e.toString()));
+      }
     }
   }
 
@@ -133,10 +143,14 @@ class AIService {
       final result =
           await callable.call<Map<dynamic, dynamic>>({'claim': claim});
       return Map<String, dynamic>.from(result.data);
-    } on FirebaseFunctionsException {
-      final prompt = _buildFactCheckPrompt(claim);
-      final response = await _callGeminiJson(prompt);
-      return _parseFactCheckResult(response);
+    } catch (_) {
+      try {
+        final prompt = _buildFactCheckPrompt(claim);
+        final response = await _callGeminiJson(prompt);
+        return _parseFactCheckResult(response);
+      } catch (e) {
+        throw Exception(_getApiKeyErrorMessage(e.toString()));
+      }
     }
   }
 
