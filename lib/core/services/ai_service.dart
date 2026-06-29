@@ -16,7 +16,7 @@ class AIService {
   // API key: loaded from build-time env var, falls back to default
   static const String _apiKey = String.fromEnvironment(
     'GEMINI_API_KEY',
-    defaultValue: 'AIzaSyCfhZgzhfXEhOv8pWOnmvp_IRS_xtfgZXk',
+    defaultValue: 'AIzaSyCNTCGKVGh8z2JVLrwvJzjRwuTouTOy1Hg',
   );
 
   final FirebaseFunctions _functions = FirebaseFunctions.instance;
